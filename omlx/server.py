@@ -4759,6 +4759,8 @@ async def create_completion(
             gen_kwargs.update(_no_repeat_ngram_kwargs(request))
             gen_kwargs.update(_ignore_eos_kwargs(request))
             gen_kwargs.update(_cache_store_kwargs(http_request))
+            if getattr(request, "priority", None) is not None:
+                gen_kwargs["priority"] = int(request.priority)
             gen_kwargs.update(
                 _specprefill_kwargs(engine, request.model, resolved_model)
             )
@@ -5260,6 +5262,17 @@ async def create_chat_completion(
         chat_kwargs.update(_ignore_eos_kwargs(request))
         chat_kwargs.update(_cache_store_kwargs(http_request))
         chat_kwargs.update(_specprefill_kwargs(engine, request.model, resolved_model))
+        # vLLM-style admission priority (PRIORITY policy only). The
+        # Anthropic-format request carries it as metadata.priority.
+        priority = getattr(request, "priority", None)
+        if priority is None and getattr(request, "metadata", None):
+            try:
+                raw = request.metadata.get("priority")
+                priority = int(raw) if raw is not None else None
+            except (AttributeError, TypeError, ValueError):
+                priority = None
+        if priority is not None:
+            chat_kwargs["priority"] = int(priority)
 
         # Add seed for reproducible generation (best-effort)
         if request.seed is not None:
@@ -6165,6 +6178,8 @@ async def stream_completion(
         gen_kwargs["repetition_context_size"] = repetition_context_size
     gen_kwargs.update(_no_repeat_ngram_kwargs(request))
     gen_kwargs.update(_ignore_eos_kwargs(request))
+    if getattr(request, "priority", None) is not None:
+        gen_kwargs["priority"] = int(request.priority)
     if skip_cache_store:
         gen_kwargs["skip_cache_store"] = True
     gen_kwargs.update(

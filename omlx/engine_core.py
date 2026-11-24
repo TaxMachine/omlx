@@ -792,6 +792,7 @@ class EngineCore:
         benchmark_trace: bool = False,
         benchmark_ane_sequence_length: int = 0,
         tools: list[dict[str, Any]] | None = None,
+        priority: int = 0,
     ) -> str:
         """
         Add a request for processing.
@@ -808,6 +809,8 @@ class EngineCore:
             specprefill: Per-request SpecPrefill override (True/False/None)
             specprefill_keep_pct: Per-request keep rate override
             specprefill_threshold: Per-request threshold override (min tokens)
+            priority: Admission priority; lower is admitted first under
+                SchedulingPolicy.PRIORITY (ignored under FCFS)
 
         Returns:
             The request ID
@@ -834,6 +837,7 @@ class EngineCore:
             preserve_reasoning=preserve_reasoning,
             benchmark_trace=benchmark_trace,
             benchmark_ane_sequence_length=benchmark_ane_sequence_length,
+            priority=priority,
         )
 
         # SpecPrefill: resolve per-request settings.

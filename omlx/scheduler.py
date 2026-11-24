@@ -1993,8 +1993,15 @@ class SchedulerConfig:
     max_num_seqs: int = 256
     # Maximum tokens to process per step (for prefill chunking)
     max_num_batched_tokens: int = 8192
-    # Scheduling policy
+    # Scheduling policy (admission order from the waiting queue)
     policy: SchedulingPolicy = SchedulingPolicy.FCFS
+    # Settings-level alias: "fcfs" or "priority". Takes effect when ``policy``
+    # is left at its default, so an explicitly constructed policy still wins.
+    queue_policy: str = "fcfs"
+
+    def __post_init__(self) -> None:
+        if self.policy is SchedulingPolicy.FCFS and self.queue_policy == "priority":
+            self.policy = SchedulingPolicy.PRIORITY
     # BatchGenerator settings (passed directly to mlx-lm)
     completion_batch_size: int = 32
     # Per-forward embedding input chunk size
@@ -2383,7 +2390,10 @@ class Scheduler:
             )
 
         # Request management - following vLLM's design
-        self.waiting: deque[Request] = deque()  # Waiting queue (FCFS)
+        # Waiting queue. FCFS under the default policy; under
+        # SchedulingPolicy.PRIORITY, add_request inserts in (priority,
+        # arrival) order so admission picks the lowest priority value first.
+        self.waiting: deque[Request] = deque()
         self.running: dict[str, Request] = {}  # Running requests by ID
         # Chunked prefill queue: requests whose prefill spans multiple steps.
         # Populated when chunked_prefill=True and prompt exceeds prefill_step_size.
@@ -11556,6 +11566,25 @@ class Scheduler:
             )
         request.pending_prefix_cache_tokens = None
 
+    def _enqueue_waiting(self, request: Request) -> None:
+        """Put ``request`` on the waiting queue in the configured order.
+
+        FCFS appends. PRIORITY inserts it ahead of the first waiting request
+        with a strictly greater priority value (lower value = admitted
+        sooner); ties keep arrival order, so equal priorities stay FCFS.
+        Priority only orders admission: it never preempts a running or
+        prefilling request, which the engine cannot interrupt mid-step.
+        """
+        if self.config.policy != SchedulingPolicy.PRIORITY or not self.waiting:
+            self.waiting.append(request)
+            return
+        priority = int(request.priority)
+        for index, queued in enumerate(self.waiting):
+            if int(queued.priority) > priority:
+                self.waiting.insert(index, request)
+                return
+        self.waiting.append(request)
+
     def add_request(self, request: Request) -> None:
         """
         Add a new request to the scheduler.
@@ -11624,7 +11653,7 @@ class Scheduler:
 
         # Add to tracking
         self.requests[request.request_id] = request
-        self.waiting.append(request)
+        self._enqueue_waiting(request)
 
         logger.debug(
             f"Added request {request.request_id} with {request.num_prompt_tokens} prompt tokens"

@@ -394,6 +394,10 @@ class ChatCompletionRequest(BaseModel):
     specprefill_threshold: Optional[int] = None
     # Seed for reproducible generation (best-effort)
     seed: Optional[int] = None
+    # Admission priority under the PRIORITY scheduling policy: lower values
+    # are admitted from the waiting queue first (vLLM-style). Ignored under
+    # the default FCFS policy. Never preempts an already-running request.
+    priority: Optional[int] = Field(default=None, ge=-1000, le=1000)
     # Per-token log probabilities of the generated tokens
     logprobs: Optional[bool] = None
     top_logprobs: Optional[int] = Field(default=None, ge=0, le=20)
@@ -554,6 +558,10 @@ class CompletionRequest(BaseModel):
     frequency_penalty: float | None = None
     # Seed for reproducible generation (best-effort)
     seed: Optional[int] = None
+    # Admission priority under the PRIORITY scheduling policy: lower values
+    # are admitted from the waiting queue first (vLLM-style). Ignored under
+    # the default FCFS policy. Never preempts an already-running request.
+    priority: Optional[int] = Field(default=None, ge=-1000, le=1000)
     # Cap reasoning/thinking tokens (parity with /v1/chat/completions)
     thinking_budget: Optional[int] = Field(default=None, ge=0)
     gpu_power_limit_w: Optional[int] = Field(default=None, ge=2, le=1000)

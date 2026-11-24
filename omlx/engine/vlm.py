@@ -5197,6 +5197,7 @@ class VLMBatchedEngine(BaseEngine):
             vlm_cache_key_ranges=vlm_cache_key_ranges,
             skip_cache_store=bool(kwargs.get("skip_cache_store", False)),
             preserve_reasoning=bool(kwargs.get("preserve_reasoning", False)),
+            priority=int(kwargs.pop("priority", 0) or 0),
             benchmark_trace=bool(kwargs.get("benchmark_trace", False)),
             benchmark_ane_sequence_length=int(
                 kwargs.get("benchmark_ane_sequence_length", 0) or 0

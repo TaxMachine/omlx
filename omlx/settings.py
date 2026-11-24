@@ -361,6 +361,12 @@ class SchedulerSettings:
     #   "balanced" (default) - fairness with the adaptive debt ratio.
     #   "decode" - fairness with the fixed debt ratio.
     concurrent_priority: str = "balanced"
+    # How requests are ordered for admission from the waiting queue:
+    #   "fcfs" (default) — arrival order.
+    #   "priority" — the request's ``priority`` first (lower admitted sooner,
+    #     ties in arrival order). Admission only; never preempts a running
+    #     request. Ignored by clients that send no priority.
+    queue_policy: str = "fcfs"
 
     @property
     def decode_fairness(self) -> bool:
@@ -394,12 +400,16 @@ class SchedulerSettings:
             concurrent_priority = (
                 "balanced" if data.get("decode_fairness", True) else "prefill"
             )
+        queue_policy = data.get("queue_policy", "fcfs")
+        if queue_policy not in ("fcfs", "priority"):
+            queue_policy = "fcfs"
         return cls(
             max_concurrent_requests=value,
             embedding_batch_size=embedding_batch_size,
             chunked_prefill=bool(data.get("chunked_prefill", False)),
             prefill_priority=prefill_priority,
             concurrent_priority=concurrent_priority,
+            queue_policy=queue_policy,
         )
 
 
@@ -2017,6 +2027,7 @@ class GlobalSettings:
             completion_batch_size=self.scheduler.max_concurrent_requests,
             embedding_batch_size=self.scheduler.embedding_batch_size,
             chunked_prefill=self.scheduler.chunked_prefill,
+            queue_policy=self.scheduler.queue_policy,
             prefill_speed_priority=(self.scheduler.prefill_priority == "speed"),
             decode_fairness=self.scheduler.decode_fairness,
             adaptive_decode_share=self.scheduler.concurrent_priority == "balanced",

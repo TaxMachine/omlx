@@ -386,6 +386,7 @@ class TestSchedulerSettings:
             "chunked_prefill": False,
             "prefill_priority": "context",
             "concurrent_priority": "balanced",
+            "queue_policy": "fcfs",
             "decode_fairness": True,
         }
 
